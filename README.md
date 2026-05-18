@@ -1,4 +1,4 @@
-![](@"./screenshot.png")
+![](./@screenshot.png)
 # notes
 
 Notes CLI/TUI for a jj-root vault.
