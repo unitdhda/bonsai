@@ -1,4 +1,4 @@
-![](@"~/Desktop/Screenshot 2026-05-19 at 03.41.01.png")
+![](@"./screenshot.png")
 # notes
 
 Notes CLI/TUI for a jj-root vault.
