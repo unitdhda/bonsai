@@ -1,4 +1,4 @@
-![](./@screenshot.png)
+![](/screenshot.png)
 # bonsai
 
 A friendly notes app for a `jj`-backed vault.
