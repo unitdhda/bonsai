@@ -1,9 +1,11 @@
-![](/preview.gif)
+![](/screenshot.png)
 # bonsai
 
-A friendly notes app for a `jj`-backed vault.
+A friendly note manager app for a `jj`-backed vault.
 
 ## Start
+Install jj, television
+
 ```bash
 ./bonsai
 ```
