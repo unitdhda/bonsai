@@ -19,18 +19,26 @@ export const IMAGE_MASCOT_ROWS: MascotRow[] = [
   { indent: 2, text: `\`=-'""\`---'       ` },
 ];
 
-const ANIM_SYMBOLS = ["8","b","s","o","Y","?","*",".","'","`"];
+const ANIM_SYMBOLS = [".", "'", "`", ",", "*"];
 
 export function animateMascotLine(line: string, row: number, t: number, seed: number): string {
   const chars = [...line];
   for (let col = 0; col < chars.length; col++) {
-    if (!/[8bsoY?*.'`]/.test(chars[col])) continue;
+    if (!/[8bsoY?*.'`,]/.test(chars[col])) continue;
+    if ((cellHash(row, col, seed) & 15) !== 0) continue;
     const h = cellHash(row, col, seed);
-    const period = 3 + (h % 9);
-    const phase  = h % 97;
-    const tri = Math.abs(((t + phase) % (period * 2)) - period);
-    if (tri === 0)
-      chars[col] = ANIM_SYMBOLS[(h + t) % ANIM_SYMBOLS.length];
+    const period = 4 + (h % 11);
+    const hold = 2 + ((h >>> 5) % 4);
+    const pause = 3 + ((h >>> 9) % 9);
+    const phase = (h >>> 3) % (period + hold + pause);
+    const cycle = period + hold + pause;
+    const pos = (t + phase) % cycle;
+    if (pos < period) {
+      const wobble = (t + (h >>> 1)) % 3 === 0 ? 0 : 1;
+      chars[col] = ANIM_SYMBOLS[(h + t + wobble) % ANIM_SYMBOLS.length];
+    } else if (pos === cycle - 1 && (h & 15) === 0) {
+      chars[col] = chars[col] === "," ? "`" : ",";
+    }
   }
   return chars.join("");
 }

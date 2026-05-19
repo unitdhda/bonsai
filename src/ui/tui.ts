@@ -227,13 +227,22 @@ export async function cmdTui() {
     onKey(str, {});
   });
 
-  const anim = setInterval(() => {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const tick = () => {
     frame++;
     fullRedraw();
-  }, 80);
+    const h = ((frame * 1103515245) ^ SESSION_BONSAI_SEED) >>> 0;
+    const base = 100 + (h % 61);
+    const pause = (h % 19 === 0) ? 220 + ((h >>> 8) % 280) : 0;
+    const drift = (h % 5 === 0) ? ((h >>> 3) % 40) : 0;
+    const delay = base + pause + drift;
+    timer = setTimeout(tick, delay);
+  };
 
   fullRedraw();
-  await new Promise<void>(() => { clearInterval(anim); });
+  timer = setTimeout(tick, 100);
+  await new Promise<void>(() => {});
+  if (timer) clearTimeout(timer);
   setTuiStatus(null);
   setTuiStream(null);
 }
