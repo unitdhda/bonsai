@@ -1,0 +1,420 @@
+[
+  {
+    "id": "29091733",
+    "stem": "inbox",
+    "path": "inbox/inbox.md",
+    "title": "Inbox",
+    "aliases": [],
+    "slug": "inbox",
+    "type": "inbox",
+    "tags": [
+      "inbox"
+    ],
+    "links": [],
+    "backlinks": [],
+    "tasks": [],
+    "habits": [],
+    "mtime": 1779203956855.657
+  },
+  {
+    "id": "2026-05-19",
+    "stem": "2026-05-19",
+    "path": "daily/2026-05-19.md",
+    "title": "Daily — 2026-05-19",
+    "aliases": [],
+    "tags": [],
+    "links": [],
+    "backlinks": [],
+    "tasks": [
+      {
+        "done": true,
+        "text": "sleep_7h"
+      },
+      {
+        "done": true,
+        "text": "meds_am"
+      },
+      {
+        "done": true,
+        "text": "evening_walk"
+      },
+      {
+        "done": true,
+        "text": "morning_walk"
+      }
+    ],
+    "habits": [
+      {
+        "key": "sleep_7h",
+        "done": true
+      },
+      {
+        "key": "meds_am",
+        "done": true
+      },
+      {
+        "key": "evening_walk",
+        "done": true
+      },
+      {
+        "key": "morning_walk",
+        "done": true
+      }
+    ],
+    "mtime": 1779203807508.392
+  },
+  {
+    "id": "1748445511-USPT",
+    "stem": "1748445511-USPT",
+    "path": "notes/general/1748445511-USPT.md",
+    "title": "Криптиды",
+    "aliases": [
+      "cryptography"
+    ],
+    "tags": [
+      "computer science",
+      "math"
+    ],
+    "links": [],
+    "backlinks": [],
+    "tasks": [],
+    "habits": [],
+    "mtime": 1779203807508.9768
+  },
+  {
+    "id": "e772d0bb",
+    "stem": "welcome",
+    "path": "notes/general/welcome.md",
+    "title": "Welcome",
+    "aliases": [],
+    "slug": "welcome",
+    "type": "note",
+    "tags": [
+      "welcome"
+    ],
+    "links": [],
+    "backlinks": [],
+    "tasks": [],
+    "habits": [],
+    "mtime": 1779203807509.189
+  },
+  {
+    "id": "1748448189-USPT",
+    "stem": "1748448189-USPT",
+    "path": "notes/general/1748448189-USPT.md",
+    "title": "психиатрия",
+    "aliases": [
+      "psychiatry"
+    ],
+    "tags": [
+      "health",
+      "me"
+    ],
+    "links": [],
+    "backlinks": [],
+    "tasks": [
+      {
+        "done": true,
+        "text": "сероквель + венла"
+      },
+      {
+        "done": true,
+        "text": "венла онли"
+      },
+      {
+        "done": true,
+        "text": "концерта + венла"
+      },
+      {
+        "done": true,
+        "text": "снова венла онли"
+      },
+      {
+        "done": true,
+        "text": "венла + арипипразол (подъем сил, акатизия, бессоницы)"
+      }
+    ],
+    "habits": [],
+    "mtime": 1779203807509.737
+  },
+  {
+    "id": "1748445439-USPT",
+    "stem": "1748445439-USPT",
+    "path": "notes/general/1748445439-USPT.md",
+    "title": "symplectic geometry",
+    "aliases": [
+      "symplecticgeo"
+    ],
+    "tags": [
+      "geometry",
+      "math"
+    ],
+    "links": [],
+    "backlinks": [
+      "1745663586-CRIT"
+    ],
+    "tasks": [
+      {
+        "done": false,
+        "text": "1. https://youtu.be/t5V7KNP9icg"
+      },
+      {
+        "done": false,
+        "text": "2. https://youtu.be/CX5CgA_NI4Y"
+      },
+      {
+        "done": false,
+        "text": "3. https://youtu.be/Be6OyDC61Ds"
+      },
+      {
+        "done": false,
+        "text": "4. https://youtu.be/L3yfhspiN2c"
+      },
+      {
+        "done": false,
+        "text": "5. https://youtu.be/KvYWwJ0NKEw"
+      },
+      {
+        "done": false,
+        "text": "6. https://youtu.be/LXydJW_ZXTM"
+      },
+      {
+        "done": false,
+        "text": "7. https://youtu.be/PBhVpHFwGqY"
+      },
+      {
+        "done": false,
+        "text": "8. https://youtu.be/iALRNED6IWQ"
+      },
+      {
+        "done": false,
+        "text": "9. https://youtu.be/6Zm0FqNQc1g"
+      },
+      {
+        "done": false,
+        "text": "10. https://youtu.be/hPx48acaMGU"
+      }
+    ],
+    "habits": [],
+    "mtime": 1779203807510.0605
+  },
+  {
+    "id": "1745663586-CRIT",
+    "stem": "1745663586-CRIT",
+    "path": "notes/general/1745663586-CRIT.md",
+    "title": "Reading list",
+    "aliases": [
+      "activity",
+      "me"
+    ],
+    "tags": [],
+    "links": [
+      "1748445439-USPT"
+    ],
+    "backlinks": [],
+    "tasks": [
+      {
+        "done": false,
+        "text": "[vim math notetake](https://castel.dev/) "
+      },
+      {
+        "done": false,
+        "text": "https://doc.rust-lang.org/book/"
+      },
+      {
+        "done": false,
+        "text": "The Psychonaut Research Project"
+      },
+      {
+        "done": false,
+        "text": "[Архитектура процессорных сетей](https://github.com/MPSU/APS)"
+      },
+      {
+        "done": false,
+        "text": "[курс созыкина по сетям](https://www.youtube.com/playlist?list=PLtPJ9lKvJ4oiNMvYbOzCmWy6cRzYAh9B1)"
+      },
+      {
+        "done": false,
+        "text": "[хэндбуки](https://education.yandex.ru/handbook)"
+      },
+      {
+        "done": false,
+        "text": "https://okmij.org/ftp/index.html"
+      },
+      {
+        "done": false,
+        "text": "https://klapaucius.github.io/fphistoryru/"
+      },
+      {
+        "done": false,
+        "text": "Морфология сказки и другие работы Проппа"
+      },
+      {
+        "done": false,
+        "text": "Калевала"
+      },
+      {
+        "done": false,
+        "text": "[Блогспот про пластиночки](https://zhuzhulingo.blogspot.com/)"
+      },
+      {
+        "done": false,
+        "text": "Волчий Дождь"
+      }
+    ],
+    "habits": [],
+    "mtime": 1779203807510.366
+  },
+  {
+    "id": "1749125875-USPT",
+    "stem": "1749125875-USPT",
+    "path": "notes/general/1749125875-USPT.md",
+    "title": "Forgotten",
+    "aliases": [
+      "Forgotten"
+    ],
+    "tags": [],
+    "links": [],
+    "backlinks": [],
+    "tasks": [],
+    "habits": [],
+    "mtime": 1779203807510.7334
+  },
+  {
+    "id": "1747072888-USPT",
+    "stem": "1747072888-USPT",
+    "path": "notes/general/1747072888-USPT.md",
+    "title": "Цели:",
+    "aliases": [
+      "ADHD training"
+    ],
+    "tags": [
+      "adhd",
+      "computer science",
+      "planning"
+    ],
+    "links": [
+      "1747235406-USPT"
+    ],
+    "backlinks": [],
+    "tasks": [
+      {
+        "done": true,
+        "text": "[хэндбук плюсы я](https://education.yandex.ru/handbook/cpp)"
+      }
+    ],
+    "habits": [],
+    "mtime": 1779203807511.127
+  },
+  {
+    "id": "1747235406-USPT",
+    "stem": "1747235406-USPT",
+    "path": "notes/general/1747235406-USPT.md",
+    "title": "SelfOverview",
+    "aliases": [
+      "SelfOverview"
+    ],
+    "tags": [
+      "adhd",
+      "planning"
+    ],
+    "links": [],
+    "backlinks": [
+      "1747072888-USPT"
+    ],
+    "tasks": [
+      {
+        "done": false,
+        "text": "хочу заниматься хендпоук татуировкой, мне нравится татуировка, сама идея её и прокалывания кожи, "
+      },
+      {
+        "done": false,
+        "text": "хочу учить математику, все равно и тут и там пригодится, когда я занимался "
+      },
+      {
+        "done": false,
+        "text": "хочу поднять свои навыки осинта и журналистики, научиться лучше искать информацию и не бояться тупиков в поиске, "
+      },
+      {
+        "done": false,
+        "text": "хочу пробовать делать классные интересные визуалы для данных и просто генеративные, "
+      },
+      {
+        "done": false,
+        "text": "рисовать в целом тоже клево, а еще фотографировать, я не вижу в этом какое-то большое будущее, но это "
+      },
+      {
+        "done": false,
+        "text": "я хочу учить языки, я очень люблю это дело, оно очень интересное и держит голову в тонусе, сам факт понимания"
+      },
+      {
+        "done": false,
+        "text": "хочу учить химию, ну по понятным причинам в контексте наркополитики было бы неплохо хотя бы как-то понимать"
+      },
+      {
+        "done": false,
+        "text": "хочу разбираться в ai, может даже не на детально научном уровне, но хотя бы на уровне инженера, "
+      },
+      {
+        "done": false,
+        "text": "хочу вернуться на кавказ или куда-то, мне хорошо когда тепло, это полезнее для моей депрессии и кожи с легкими, "
+      }
+    ],
+    "habits": [],
+    "mtime": 1779203807511.8252
+  },
+  {
+    "id": "1745663479-USPT",
+    "stem": "1745663479-USPT",
+    "path": "notes/general/1745663479-USPT.md",
+    "title": "Домашнее и собаке",
+    "aliases": [
+      "Things"
+    ],
+    "tags": [
+      "home",
+      "me",
+      "stuff"
+    ],
+    "links": [],
+    "backlinks": [],
+    "tasks": [
+      {
+        "done": false,
+        "text": "очки (нужно дойти до окулиста) безободковые"
+      },
+      {
+        "done": false,
+        "text": "очки солнцезащитные или тонировка на обычные"
+      }
+    ],
+    "habits": [],
+    "mtime": 1779203807512.353
+  },
+  {
+    "id": "20260519-e2z1ibta",
+    "stem": "20260519-e2z1ibta",
+    "path": "notes/general/20260519-e2z1ibta.md",
+    "title": "20260519-e2z1ibta",
+    "aliases": [],
+    "tags": [],
+    "links": [],
+    "backlinks": [],
+    "tasks": [],
+    "habits": [],
+    "mtime": 1779203807512.626
+  },
+  {
+    "id": "daily-note",
+    "stem": "daily-note",
+    "path": "templates/daily-note.md",
+    "title": "Daily — {{date:YYYY-MM-DD}}",
+    "aliases": [],
+    "tags": [],
+    "links": [],
+    "backlinks": [],
+    "tasks": [],
+    "habits": [],
+    "mtime": 1779203807512.9294
+  }
+]
