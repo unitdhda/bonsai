@@ -405,19 +405,6 @@
     "mtime": 1779203807512.626
   },
   {
-    "id": "20260519-hb9iv8ha",
-    "stem": "20260519-hb9iv8ha",
-    "path": "foo/20260519-hb9iv8ha.md",
-    "title": "20260519-hb9iv8ha",
-    "aliases": [],
-    "tags": [],
-    "links": [],
-    "backlinks": [],
-    "tasks": [],
-    "habits": [],
-    "mtime": 1779211285125.9937
-  },
-  {
     "id": "daily-note",
     "stem": "daily-note",
     "path": "templates/daily-note.md",
