@@ -1,9 +1,15 @@
 {
   "dependencies": {
-    "@curl.md/pi": "^0.1.2",
     "ink": "^7.0.3",
-    "pi-extensions": "/Users/unitf90/.pi/agent/npm",
     "react": "^19.2.6",
     "react-devtools-core": "^7.0.1"
+  },
+  "scripts": {
+    "lint": "biome lint notes.ts mascot.ts src/**/*.ts notes.test.ts",
+    "lint:fix": "biome lint --write notes.ts mascot.ts src/**/*.ts notes.test.ts",
+    "build": "bun build ./notes.ts --compile --outfile ./bonsai"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.15"
   }
 }
