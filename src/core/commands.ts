@@ -1,7 +1,9 @@
-import { readdirSync, readFileSync, statSync, writeFileSync, existsSync, mkdirSync, renameSync, writeSync, fstatSync } from "node:fs";
-import { join, relative, basename, dirname } from "node:path";
+import { readdirSync, readFileSync, statSync, writeFileSync, existsSync, mkdirSync, renameSync, writeSync, fstatSync, mkdtempSync, rmSync, symlinkSync, realpathSync } from "node:fs";
+import { join, relative, basename, dirname, isAbsolute } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
-import { homedir } from "node:os";
+import { createInterface } from "node:readline/promises";
+import { homedir, tmpdir } from "node:os";
+import { stdin, stdout } from "node:process";
 import type { Task, Habit, Note, Suspendable } from "../types/index.ts";
 import { H1_RE, HABIT_RE, TASK_RE, DAILY_NOTE_RE } from "../types/index.ts";
 import { getOrCreate, randomId, slugify, yamlStringify } from "./utils.ts";
@@ -123,21 +125,41 @@ function loadIndex(force = false): Note[] {
 
 function cmdIndex() { const n = loadIndex(true); console.log(`Indexed ${n.length} notes -> ${getIndex()}`); }
 
+function vaultSyncConfigText() {
+  if (hasBinary("jj")) {
+    return `jj:\n  aliases:\n    sync:\n      - jj git remote add origin\n      - jj bookmark set\n      - jj bookmark track\n      - jj move\n      - jj describe -m "notes snapshot"\n      - jj git push\n    snapshot:\n      - jj status\n      - jj describe -m "notes snapshot"\n      - jj new\n    review:\n      - jj status\n      - jj diff\n`;
+  }
+  return `git:\n  aliases:\n    sync:\n      - git add -A\n      - git commit -m "notes snapshot"\n      - git pull --rebase --autostash\n      - git push\n    snapshot:\n      - git status\n      - git commit -m "notes snapshot"\n    review:\n      - git status\n      - git diff\n`;
+}
+
 function ensureConfig() {
   mkdirSync(getConfigDir(), { recursive: true });
   if (!existsSync(getHabitsConfig())) writeFileSync(getHabitsConfig(), `habits:\n  sleep_7h:\n    title: Sleep 7h+\n  meds_am:\n    title: Morning meds\n  walk_30m:\n    title: Walk 30m+\n  reading_30m:\n    title: Reading 30m+\n`);
-  if (!existsSync(getVaultConfig())) writeFileSync(getVaultConfig(), `jj:\n  aliases:\n    sync:\n      - jj git remote add origin\n      - jj bookmark set\n      - jj bookmark track\n      - jj move\n      - jj describe -m "notes snapshot"\n      - jj git push\n    snapshot:\n      - jj status\n      - jj describe -m "notes snapshot"\n      - jj new\n    review:\n      - jj status\n      - jj diff\n`);
+  if (!existsSync(getVaultConfig())) writeFileSync(getVaultConfig(), vaultSyncConfigText());
+}
+
+function readHabitDefinitions() {
+  ensureConfig();
+  const txt = readFileSync(getHabitsConfig(), "utf8");
+  const defs: Array<{ key: string; title: string }> = [];
+  let current: string | null = null;
+  for (const line of txt.split("\n")) {
+    const keyMatch = line.match(/^ {2}([a-zA-Z0-9_-]+):\s*$/);
+    if (keyMatch) {
+      current = keyMatch[1];
+      defs.push({ key: current, title: current });
+      continue;
+    }
+    const titleMatch = line.match(/^ {4}title:\s*(.+)\s*$/);
+    if (titleMatch && current) {
+      defs[defs.length - 1].title = titleMatch[1].replace(/^"|"$/g, "");
+    }
+  }
+  return defs;
 }
 
 function readHabitKeys() {
-  ensureConfig();
-  const txt = readFileSync(getHabitsConfig(), "utf8");
-  const keys: string[] = [];
-  for (const line of txt.split("\n")) {
-    const m = line.match(/^ {2}([a-zA-Z0-9_-]+):\s*$/);
-    if (m) keys.push(m[1]);
-  }
-  return keys;
+  return readHabitDefinitions().map(def => def.key);
 }
 
 function syncDailyHabits(path: string) {
@@ -160,8 +182,7 @@ function syncDailyHabits(path: string) {
 
 function cmdSearch(q = "") {
   if (!q) {
-    cmdFind();
-    return;
+    return cmdFind();
   }
 
   const notes = loadIndex();
@@ -183,9 +204,9 @@ function cmdBacklinks(note = "") {
   }
 }
 
-function openInEditor(file: string) {
+function openInEditor(file: string | string[]) {
   const editor = process.env.EDITOR;
-  const p = vaultPath(file);
+  const files = (Array.isArray(file) ? file : [file]).map(vaultPath);
 
   const stdinIsTTY = (() => {
     try { return fstatSync(0).isCharacterDevice(); }
@@ -197,13 +218,98 @@ function openInEditor(file: string) {
   })();
 
   if (!editor || !stdinIsTTY || !stdoutIsTTY) {
-    writeSync(1, `${relative(getVault(), p)}\n`);
+    for (const p of files) writeSync(1, `${relative(getVault(), p)}\n`);
     return;
   }
 
-  const result = spawnSync(editor, [p], { stdio: "inherit", shell: true });
+  const result = spawnSync(editor, files, { stdio: "inherit", shell: true });
   if ((result.status ?? 1) !== 0) {
-    writeSync(1, `${relative(getVault(), p)}\n`);
+    for (const p of files) writeSync(1, `${relative(getVault(), p)}\n`);
+  }
+}
+
+function hasBinary(bin: string) {
+  return spawnSync("which", [bin], { encoding: "utf8" }).status === 0;
+}
+
+async function promptNative(promptText: string, defaultVal = "") {
+  if (!stdin.isTTY || !stdout.isTTY) return defaultVal;
+  const rl = createInterface({ input: stdin, output: stdout });
+  try {
+    const answer = await rl.question(`${promptText}${defaultVal ? ` [${defaultVal}]` : ""} `);
+    return (answer.trim() || defaultVal).trim();
+  } finally {
+    rl.close();
+  }
+}
+
+function isInteractiveTerminal() {
+  try { return fstatSync(0).isCharacterDevice() && fstatSync(1).isCharacterDevice(); }
+  catch { return false; }
+}
+
+function normalizeVaultSelection(raw: string, cwd: string, map?: Map<string, string>) {
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  const abs = isAbsolute(trimmed) ? trimmed : join(cwd || getVault(), trimmed);
+  let resolved = abs;
+  try { resolved = realpathSync(abs); } catch {}
+  resolved = map?.get(resolved) ?? map?.get(abs) ?? resolved;
+  const rel = relative(getVault(), resolved);
+  if (!rel || rel.startsWith("..")) return undefined;
+  return rel;
+}
+
+function uniqueStrings(values: string[]) {
+  return [...new Set(values)];
+}
+
+function collectMarkdownFiles() {
+  return walkMd(getVault()).map(path => ({ abs: path, rel: relative(getVault(), path) }));
+}
+
+function prepareYaziRoot() {
+  const tempDir = mkdtempSync(join(tmpdir(), "bonsai-yazi-"));
+  const root = join(tempDir, "root");
+  const map = new Map<string, string>();
+  mkdirSync(root, { recursive: true });
+  for (const { abs, rel } of collectMarkdownFiles()) {
+    const dest = join(root, rel);
+    mkdirSync(dirname(dest), { recursive: true });
+    map.set(dest, abs);
+    try { symlinkSync(abs, dest); }
+    catch {
+      try { if (!existsSync(dest)) writeFileSync(dest, readFileSync(abs)); }
+      catch {}
+    }
+  }
+  return { tempDir, root, map };
+}
+
+function parseTagList(raw: string) {
+  return raw.split(/[\s,]+/).map(tag => tag.trim()).filter(Boolean);
+}
+
+function readYaziSelection() {
+  if (!hasBinary("yazi") || !isInteractiveTerminal()) {
+    return undefined;
+  }
+
+  const tempDir = mkdtempSync(join(tmpdir(), "bonsai-yazi-"));
+  const chooserFile = join(tempDir, "chooser");
+  const cwdFile = join(tempDir, "cwd");
+
+  try {
+    withSuspend(() => spawnSync("yazi", ["--cwd-file", cwdFile, "--chooser-file", chooserFile, getVault()], { stdio: "inherit" }));
+    if (!existsSync(chooserFile)) return [];
+    const cwd = existsSync(cwdFile) ? readFileSync(cwdFile, "utf8").trim() : getVault();
+    const paths = readFileSync(chooserFile, "utf8")
+      .split("\n")
+      .map(line => normalizeVaultSelection(line, cwd))
+      .filter((value): value is string => Boolean(value));
+    return uniqueStrings(paths);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
   }
 }
 
@@ -248,6 +354,73 @@ function pickWithFzf(rows: string, prompt: string, query = "", options: string[]
   return withSuspend(() => spawnSync("fzf", args, { input: rows, encoding: "utf8" }).stdout.trim());
 }
 
+const NOTE_ACTIONS = ["open", "backlinks", "links", "preview", "copy path", "move", "tag", "archive", "cancel"] as const;
+
+function scoreNote(note: Note, query: string) {
+  const q = query.toLowerCase();
+  const hay = `${note.path} ${note.title} ${note.tags.join(" ")} ${note.aliases.join(" ")} ${note.slug ?? ""}`.toLowerCase();
+  return hay.includes(q) ? 0 : 1;
+}
+
+async function pickActionNative(files: string[]) {
+  console.log(`\nSelected: ${files.length} file(s)`);
+  for (let i = 0; i < NOTE_ACTIONS.length; i++) console.log(`  ${i + 1}. ${NOTE_ACTIONS[i]}`);
+  const choice = await promptNative("action", "1");
+  return NOTE_ACTIONS[(Number(choice) || 1) - 1] ?? "cancel";
+}
+
+async function promptForFolder(defaultVal = "notes/general") {
+  return hasBinary("fzf") ? promptUser("folder", defaultVal) : await promptNative("folder", defaultVal);
+}
+
+async function promptForTags(defaultVal = "") {
+  return hasBinary("fzf") ? promptUser("tags", defaultVal) : await promptNative("tags", defaultVal);
+}
+
+async function runNoteAction(action: string, files: string[]) {
+  if (action === "open") openInEditor(files);
+  else if (action === "backlinks") for (const file of files) cmdBacklinks(file.replace(/\.md$/, ""));
+  else if (action === "links") for (const file of files) cmdLinks(file.replace(/\.md$/, ""));
+  else if (action === "preview") for (const file of files) cmdPreview(file);
+  else if (action === "copy path") spawnSync("pbcopy", { input: files.join("\n"), encoding: "utf8" });
+  else if (action === "move") {
+    const folder = await promptForFolder();
+    if (!folder) return;
+    for (const file of files) cmdMove(file, folder);
+  } else if (action === "tag") {
+    const tags = parseTagList(await promptForTags());
+    if (!tags.length) return;
+    for (const file of files) cmdTag(file, "add", tags.join(" "));
+  } else if (action === "archive") {
+    for (const file of files) archiveSelectedFile(file);
+    cmdIndex();
+    console.log(`Deleted (archived): ${files.length} file(s)`);
+  }
+}
+
+async function chooseNoteAction(files: string[]) {
+  const normalized = uniqueStrings(files.map(file => normalizeVaultSelection(file, getVault()) ?? file));
+  const noteFiles: string[] = [];
+  const otherFiles: string[] = [];
+  for (const file of normalized) {
+    const rel = normalizeVaultSelection(file, getVault()) ?? file;
+    if (findNote(rel)) noteFiles.push(rel);
+    else otherFiles.push(rel);
+  }
+
+  if (otherFiles.length) openInEditor(otherFiles);
+  if (!noteFiles.length) return;
+
+  if (hasBinary("fzf")) {
+    const action = withSuspend(() => spawnSync("fzf", ["--prompt", "action > ", "--height", "40%", "--border", "rounded"], { input: NOTE_ACTIONS.join("\n"), encoding: "utf8" })).stdout.trim();
+    if (!action || action === "cancel") return;
+    return runNoteAction(action, noteFiles);
+  }
+  const action = await pickActionNative(noteFiles);
+  if (action === "cancel") return;
+  return runNoteAction(action, noteFiles);
+}
+
 function pickNote(query = ""): Note | undefined {
   const exact = query ? findNote(query) : undefined;
   if (exact) return exact;
@@ -285,29 +458,48 @@ function pickFolder(query = ""): string | undefined {
   return out || undefined;
 }
 
-function cmdFind(initialQuery = "") {
+async function pickNoteNative(initialQuery = "", kind: "notes" | "recent" | "dailies" = "notes") {
   const notes = loadIndex();
-  const rows = notes.map(n => {
+  const list = kind === "recent" ? [...notes].sort((a, b) => b.mtime - a.mtime)
+    : kind === "dailies" ? notes.filter(note => DAILY_NOTE_RE.test(note.path)).sort((a, b) => (a.path < b.path ? 1 : -1))
+    : notes;
+  const query = (initialQuery || await promptNative("note search")).trim().toLowerCase();
+  const matches = query ? list.filter(note => scoreNote(note, query)) : list;
+  if (!matches.length) return undefined;
+  if (matches.length === 1) return matches[0];
+  console.log("\nMatches:");
+  matches.slice(0, 10).forEach((note, i) => console.log(`  ${i + 1}. ${note.path}  ${note.title}`));
+  const pick = await promptNative("select # or path", "1");
+  const idx = Number(pick);
+  if (Number.isFinite(idx) && idx > 0) return matches[idx - 1];
+  return matches.find(note => note.path === pick || note.path.replace(/\.md$/, "") === pick || note.slug === pick || note.id === pick);
+}
+
+async function cmdFind(initialQuery = "", kind: "notes" | "recent" | "dailies" = "notes") {
+  if (!hasBinary("fzf")) {
+    const picked = await pickNoteNative(initialQuery, kind);
+    if (!picked) return;
+    return chooseNoteAction(picked.path);
+  }
+
+  const notes = loadIndex();
+  const list = kind === "recent" ? [...notes].sort((a, b) => b.mtime - a.mtime)
+    : kind === "dailies" ? notes.filter(note => DAILY_NOTE_RE.test(note.path)).sort((a, b) => (a.path < b.path ? 1 : -1))
+    : notes;
+  const rows = list.map(n => {
     const body = readFileSync(vaultPath(n.path), "utf8").replace(/\s+/g, " ").slice(0, 1200);
     return `${n.path}\t${n.title}\t${n.tags.join(",")}\t${n.slug ?? ""}\t${body}`;
   }).join("\n");
   const fzfArgs = [
-    "--prompt", "note > ", "--height", "60%", "--layout", "reverse", "--border", "rounded",
-    "--delimiter", "\t", "--with-nth", "1,2,3", "--preview", `${selfCommand()} tv preview notes {}`,
+    "--prompt", `${kind === "notes" ? "note" : kind} > `, "--height", "60%", "--layout", "reverse", "--border", "rounded",
+    "--delimiter", "\t", "--with-nth", "1,2,3", "--preview", `${selfCommand()} tv preview ${kind} {}`,
   ];
   if (initialQuery) fzfArgs.push("--query", initialQuery);
   const r = withSuspend(() => spawnSync("fzf", fzfArgs, { input: rows, encoding: "utf8" }));
   const out = (r.stdout || "").trim();
   if (!out) return;
   const file = out.split("\t", 1)[0];
-  const actions = ["open", "backlinks", "links", "preview", "copy path", "archive", "cancel"];
-  const a = withSuspend(() => spawnSync("fzf", ["--prompt", "action > ", "--height", "40%", "--border", "rounded"], { input: actions.join("\n"), encoding: "utf8" })).stdout.trim();
-  if (a === "open") withSuspend(() => openInEditor(file));
-  else if (a === "backlinks") cmdBacklinks(file.replace(/\.md$/, ""));
-  else if (a === "links") cmdLinks(file.replace(/\.md$/, ""));
-  else if (a === "preview") withSuspend(() => cmdPreview(file));
-  else if (a === "copy path") spawnSync("pbcopy", { input: file, encoding: "utf8" });
-  else if (a === "archive") cmdArchive(file);
+  return chooseNoteAction(file);
 }
 
 function findNote(note: string) {
@@ -397,9 +589,17 @@ function cmdHabitToggle(habit = "", date?: string) {
 }
 
 function streak(days: Array<{ date: string; done: boolean }>): number {
-  const sorted = days.sort((a, b) => (a.date < b.date ? 1 : -1));
+  const today = new Date().toISOString().slice(0, 10);
+  const sorted = [...days]
+    .filter(day => day.date <= today)
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+  if (!sorted.length) return 0;
+  const visible = [...sorted];
+  if (visible[0].date === today && !visible[0].done) visible.shift();
   let s = 0;
-  for (const d of sorted) { if (d.done) s++; else break; }
+  for (const d of visible) {
+    if (d.done) s++; else break;
+  }
   return s;
 }
 
@@ -560,10 +760,75 @@ function cmdDelete(note = "") {
   console.log(`Deleted (archived): ${n.path}`);
 }
 
+function archiveSelectedFile(file: string) {
+  const rel = normalizeVaultSelection(file, getVault()) ?? file;
+  const src = vaultPath(rel);
+  if (!existsSync(src)) return false;
+  const dest = join(getVault(), "archive", rel);
+  mkdirSync(dirname(dest), { recursive: true });
+  renameSync(src, dest);
+  return true;
+}
+
+function moveSelectedFile(file: string, folder: string) {
+  const rel = normalizeVaultSelection(file, getVault()) ?? file;
+  const src = vaultPath(rel);
+  if (!existsSync(src)) return false;
+  const dest = join(getVault(), folder, rel);
+  mkdirSync(dirname(dest), { recursive: true });
+  renameSync(src, dest);
+  return true;
+}
+
+function updateTagsOnFile(file: string, mode: "add" | "remove", tags: string[]) {
+  const rel = normalizeVaultSelection(file, getVault()) ?? file;
+  const p = vaultPath(rel);
+  if (!existsSync(p)) return false;
+  const src = readFileSync(p, "utf8");
+  const { fm, body } = parseFrontmatter(src);
+  const current = Array.isArray(fm.tags)
+    ? fm.tags.map(String)
+    : typeof fm.tags === "string" && fm.tags
+      ? [String(fm.tags)]
+      : [];
+  const next = mode === "add"
+    ? uniqueStrings([...current, ...tags.map(tag => tag.trim()).filter(Boolean)])
+    : current.filter(tag => !tags.includes(tag));
+  fm.tags = next;
+  writeFileSync(p, yamlStringify(fm) + body);
+  return true;
+}
+
+function cmdTag(note = "", mode: "add" | "remove" = "add", tagText = "") {
+  const n = note ? pickNote(note) : pickNote();
+  if (!n) return console.log("Note not found");
+  const tags = parseTagList(tagText);
+  const prompt = mode === "add" ? "tags to add" : "tags to remove";
+  const chosen = tags.length ? tags : parseTagList(promptUser(prompt));
+  if (!chosen.length) return;
+  if (updateTagsOnFile(n.path, mode, chosen)) {
+    cmdIndex();
+    console.log(`${mode === "add" ? "Tagged" : "Untagged"}: ${n.path}`);
+  }
+}
+
+function cmdExplore(_raw = "") {
+  const pick = readYaziSelection();
+  if (pick === undefined) {
+    if (!hasBinary("yazi")) console.log("yazi not found. Install yazi to use explore, or use 'bonsai search'.");
+    else if (!isInteractiveTerminal()) console.log("explore needs an interactive terminal; use 'bonsai search' instead.");
+
+    if (!isInteractiveTerminal()) return;
+    return cmdFind();
+  }
+  if (!pick.length) return;
+  return chooseNoteAction(pick);
+}
+
 // ── tasks ────────────────────────────────────────────────────────────────────
 
 function cmdTasks(filter?: string) {
-  const notes = loadIndex();
+  const notes = loadIndex(true);
   let found = false;
   for (const n of notes) {
     const tasks = filter === "open" ? n.tasks.filter(t => !t.done)
@@ -637,10 +902,10 @@ function cmdTaskAction(ref: string, mode: "toggle" | "close" | "delete") {
 // ── habits ───────────────────────────────────────────────────────────────────
 
 function cmdHabitList() {
-  const keys = readHabitKeys();
+  const defs = readHabitDefinitions();
   const habitMap = buildHabitMap(loadIndex());
 
-  for (const key of keys) {
+  for (const { key, title } of defs) {
     const entries = habitMap.get(key) ?? [];
     const done = entries.filter(entry => entry.done).length;
     const total = entries.length;
@@ -649,7 +914,7 @@ function cmdHabitList() {
     const filled = Math.round(pct / 10);
     const bar = "█".repeat(filled) + "░".repeat(10 - filled);
 
-    console.log(`${key.padEnd(16)} ${bar} ${pct}%  streak=${streakDays}d`);
+    console.log(`${title.padEnd(16)} ${bar} ${pct}%  streak=${streakDays}d`);
   }
 }
 
@@ -726,18 +991,24 @@ function cmdHabitFill(key: string, date: string) {
 
 // ── daily helpers ─────────────────────────────────────────────────────────────
 
-function cmdDailyNav(direction: "yesterday" | "tomorrow") {
-  if (!existsSync(getDailyDir())) {
-    console.log(`No ${direction} daily note`);
-    return;
-  }
+function addDays(date: string, delta: number) {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
 
-  const files = readdirSync(getDailyDir()).filter(f => /^\d{4}-\d{2}-\d{2}\.md$/.test(f)).sort();
+function cmdDailyNav(direction: "yesterday" | "tomorrow") {
   const today = new Date().toISOString().slice(0, 10);
-  const current = files.indexOf(`${today}.md`);
-  const target = direction === "yesterday" ? files[current - 1] : files[current + 1];
-  if (!target) return console.log(`No ${direction} daily note`);
-  openInEditor(join(getDailyDir(), target));
+  const targetDate = direction === "yesterday" ? addDays(today, -1) : addDays(today, 1);
+  const dir = getDailyDir();
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const targetPath = join(dir, `${targetDate}.md`);
+  if (!existsSync(targetPath)) {
+    writeFileSync(targetPath, renderDaily(targetDate));
+    console.log(`Created ${relative(getVault(), targetPath)}`);
+  }
+  syncDailyHabits(targetPath);
+  openInEditor(targetPath);
 }
 
 function cmdDailyReview() {
@@ -870,14 +1141,23 @@ function cmdInit() {
   // Home directory warning disabled for now
   // if (root === home) { ... }
   
-  const jjCheck = spawnSync("jj", ["root"], { cwd: root, encoding: "utf8" });
-  if (jjCheck.status !== 0) {
-    console.log("Initializing jj repo...");
-    const r = spawnSync("jj", ["git", "init"], { cwd: root, stdio: "inherit" });
-    if ((r.status ?? 0) !== 0) {
-      console.log("jj git init failed, trying jj init...");
-      spawnSync("jj", ["init"], { cwd: root, stdio: "inherit" });
+  if (hasBinary("jj")) {
+    const jjCheck = spawnSync("jj", ["root"], { cwd: root, encoding: "utf8" });
+    if (jjCheck.status !== 0) {
+      console.log("Initializing jj repo...");
+      const r = spawnSync("jj", ["git", "init"], { cwd: root, stdio: "inherit" });
+      if ((r.status ?? 0) !== 0) {
+        console.log("jj git init failed, trying jj init...");
+        spawnSync("jj", ["init"], { cwd: root, stdio: "inherit" });
+      }
     }
+  } else if (hasBinary("git")) {
+    console.log("Initializing git repo...");
+    let r = spawnSync("git", ["init", "-b", "main"], { cwd: root, stdio: "inherit" });
+    if ((r.status ?? 0) !== 0) r = spawnSync("git", ["init"], { cwd: root, stdio: "inherit" });
+    if ((r.status ?? 0) !== 0) console.log("git init failed");
+  } else {
+    console.log("Neither jj nor git found in PATH");
   }
   const notesRoot = process.env.NOTES_ROOT || root;
   for (const d of ["inbox", "notes/general", "projects", "daily", "archive", "templates", "config"]) {
@@ -892,7 +1172,7 @@ function cmdInit() {
     writeFileSync(habitsPath, `habits:\n  sleep_7h:\n    title: Sleep 7h+\n  meds_am:\n    title: Morning meds\n  walk_30m:\n    title: Walk 30m+\n`);
   }
   if (!existsSync(vaultConfigPath)) {
-    writeFileSync(vaultConfigPath, `jj:\n  aliases:\n    sync:\n      - jj status\n      - jj git push\n    snapshot:\n      - jj status\n      - jj describe -m "notes snapshot"\n      - jj new\n    review:\n      - jj status\n      - jj diff\n`);
+    writeFileSync(vaultConfigPath, vaultSyncConfigText());
   }
 
   // daily template
@@ -1152,7 +1432,7 @@ function cmdTutorial() {
   console.log("  index · search · backlinks · orphans · tasks · quick · move · stats\n");
   console.log("  What's next:");
   console.log("  notes today          open today's daily note");
-  console.log("  notes find           fuzzy-pick any note with action menu");
+  console.log("  notes search         fuzzy-pick any note with action menu");
   console.log("  notes habit <key>    toggle a habit in today's daily note");
   console.log("  notes new <title>    create a new note from template\n");
   pick("", ["done"]);
@@ -1212,7 +1492,7 @@ function cmdMigrate() {
 }
 
 function cmdStats() {
-  const notes = loadIndex();
+  const notes = loadIndex(true);
   const tags = new Map<string, number>();
   const { done: tasksDone, total: tasksTotal } = countTasks(notes);
   const habitMap = new Map<string, Array<{ date: string; done: boolean }>>();
@@ -1222,6 +1502,8 @@ function cmdStats() {
     if (!date) continue;
     for (const h of n.habits) getOrCreate(habitMap, h.key, () => []).push({ date, done: h.done });
   }
+  const habitDefs = readHabitDefinitions();
+  const habitTitle = new Map(habitDefs.map(def => [def.key, def.title] as const));
   console.log(`Notes: ${notes.length}`);
   console.log(`Tasks: ${tasksDone}/${tasksTotal}`);
   console.log("Top tags:");
@@ -1232,7 +1514,8 @@ function cmdStats() {
       const done = arr.filter(x => x.done).length;
       const total = arr.length;
       const pct = Math.round((done / Math.max(1, total)) * 100);
-      console.log(`- ${k}: ${done}/${total} (${pct}%), streak=${streak(arr)}d`);
+      const label = habitTitle.get(k) ?? k;
+      console.log(`- ${label}: ${done}/${total} (${pct}%), streak=${streak(arr)}d`);
     }
   }
 }
@@ -1424,12 +1707,91 @@ async function cmdJjSync() {
   emitTuiStatus("sync: done");
 }
 
+function listGitRemotes(cwd = getVault()) {
+  const r = spawnSync("git", ["remote"], { cwd, encoding: "utf8" });
+  return (r.stdout || "").split("\n").map(line => line.trim()).filter(Boolean);
+}
+
+function gitCurrentBranch(cwd = getVault()) {
+  const r = spawnSync("git", ["branch", "--show-current"], { cwd, encoding: "utf8" });
+  return (r.stdout || "").trim() || "main";
+}
+
+function isGitRepo(cwd = getVault()) {
+  const r = spawnSync("git", ["rev-parse", "--is-inside-work-tree"], { cwd, encoding: "utf8" });
+  return r.status === 0 && (r.stdout || "").trim() === "true";
+}
+
+async function ensureGitSyncRemote(): Promise<string | undefined> {
+  const remotes = listGitRemotes();
+  if (remotes.length) return remotes.includes("origin") ? "origin" : remotes[0];
+  emitTuiStatus("sync: remote missing — enter URL");
+  const remoteUrl = promptUser("remote url");
+  if (!remoteUrl) return undefined;
+  emitTuiStatus("sync: adding remote origin");
+  const r = spawnSync("git", ["remote", "add", "origin", remoteUrl], { cwd: getVault(), stdio: "inherit" });
+  if ((r.status ?? 0) !== 0) {
+    console.log("failed to add remote");
+    return undefined;
+  }
+  return "origin";
+}
+
+async function cmdGitSync() {
+  const cwd = getVault();
+  if (!isGitRepo(cwd)) {
+    console.log("git repo not found; run init first");
+    return;
+  }
+  const remote = await ensureGitSyncRemote();
+  if (!remote) return;
+  const branch = gitCurrentBranch(cwd);
+
+  emitTuiStatus("sync: stage changes");
+  const status = spawnSync("git", ["status", "--porcelain"], { cwd, encoding: "utf8" });
+  if ((status.stdout || "").trim()) {
+    const add = spawnSync("git", ["add", "-A"], { cwd, stdio: "inherit" });
+    if ((add.status ?? 0) !== 0) {
+      console.log("git add failed");
+      return;
+    }
+    const commit = spawnSync("git", ["commit", "-m", "notes snapshot"], { cwd, stdio: "inherit" });
+    if ((commit.status ?? 0) !== 0) {
+      const msg = `${commit.stdout || ""}\n${commit.stderr || ""}`.toLowerCase();
+      if (!msg.includes("nothing to commit")) {
+        console.log("git commit failed");
+        return;
+      }
+    }
+  }
+
+  emitTuiStatus(`sync: pull ${remote}/${branch}`);
+  const pull = spawnSync("git", ["pull", "--rebase", "--autostash", remote, branch], { cwd, stdio: "inherit" });
+  if ((pull.status ?? 0) !== 0) {
+    console.log("git pull failed");
+    return;
+  }
+
+  emitTuiStatus(`sync: push ${remote}/${branch}`);
+  const push = spawnSync("git", ["push", "-u", remote, branch], { cwd, stdio: "inherit" });
+  if ((push.status ?? 0) !== 0) {
+    console.log("git push failed");
+    return;
+  }
+  emitTuiStatus("sync: done");
+}
+
+async function cmdSync() {
+  if (hasBinary("jj")) return cmdJjSync();
+  return cmdGitSync();
+}
+
 function cmdJjAlias(name: string) {
   const aliases: Record<string, string[][]> = {
     snapshot: [["status"], ["describe", "-m", "notes snapshot"], ["new"]],
     review: [["status"], ["diff"]],
   };
-  if (name === "sync") return cmdJjSync();
+  if (name === "sync") return cmdSync();
   const steps = aliases[name];
   if (!steps) return console.log(`Unknown jj alias: ${name}`);
   for (const args of steps) {
@@ -1452,7 +1814,7 @@ function tvConfigDir() {
 }
 
 function cmdTvItems(kind: string) {
-  const notes = loadIndex();
+  const notes = loadIndex(true);
   if (kind === "notes" || kind === "recent") {
     const list = kind === "recent" ? [...notes].sort((a, b) => b.mtime - a.mtime) : notes;
     for (const n of list) console.log(`${n.path}\t${n.title}\t${n.tags.join(",")}`);
@@ -1464,8 +1826,13 @@ function cmdTvItems(kind: string) {
       const p = vaultPath(n.path);
       if (!existsSync(p)) continue;
       const lines = readFileSync(p, "utf8").split("\n");
+      let inHabits = false;
       for (let i = 0; i < lines.length; i++) {
-        const m = lines[i].match(TASK_RE);
+        const line = lines[i];
+        if (/^##\s+Habits\s*$/.test(line)) { inHabits = true; continue; }
+        if (inHabits && /^##\s+/.test(line)) inHabits = false;
+        if (inHabits) continue;
+        const m = line.match(TASK_RE);
         if (!m) continue;
         const status = m[1].toLowerCase() === "x" ? "done" : "open";
         const taskId = `${n.path}:${i + 1}`;
@@ -1573,15 +1940,24 @@ function cmdTvInstallChannels() {
   console.log(`Wrote channels to ${dir}`);
 }
 
+function cmdFzf(channel: string) {
+  if (channel === "recent" || channel === "dailies" || channel === "notes") return cmdFind("", channel);
+  if (channel === "habits") return cmdHabitList();
+  if (channel === "tasks") return cmdTasks();
+  return cmdFind("");
+}
+
 function cmdTv(channel: string) {
   if (!channel) return console.log("Usage: tv <notes|recent|dailies|habits|tasks>");
-  withSuspend(() => spawnSync("tv", [channel], { stdio: "inherit" }));
+  if (hasBinary("tv")) return withSuspend(() => spawnSync("tv", [channel], { stdio: "inherit" }));
+  return cmdFzf(channel);
 }
 
 function cmdCommandBar() {
   const rows = [
     ["index", "Rebuild note index cache"],
-    ["find", "Fuzzy note+content search, then action menu"],
+    ["search", "Search notes and open an action menu"],
+    ["explore", "Browse notes in yazi and act on selections"],
     ["search ", "Search metadata (id/title/aliases/tags)"],
     ["backlinks ", "Show notes linking to a note"],
     ["daily open", "Create/open daily note"],
@@ -1592,6 +1968,7 @@ function cmdCommandBar() {
     ["tui", "Open interactive TUI"],
     ["preview ", "Render note preview via dprint"],
     ["view ", "Pretty markdown view with header"],
+    ["tag", "Add or remove tags on a note"],
     ["sync", "Run jj sync"],
     ["recent", "Browse recently modified notes"],
     ["tv install-channels", "Install television channels"],
@@ -1625,6 +2002,7 @@ export {
   getIndex,
   getDailyDir,
   getTemplate,
+  getHabitsConfig,
   DAILY_NOTE_RE,
   detectVaultRoot,
   vaultPath,
@@ -1664,6 +2042,8 @@ export {
   cmdHabitSet,
   cmdDailyHabitToggle,
   cmdHabitFill,
+  cmdTag,
+  cmdExplore,
   cmdDailyNav,
   cmdDailyReview,
   cmdDoctor,

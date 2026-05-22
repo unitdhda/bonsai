@@ -1,11 +1,30 @@
 // React components for TUI
 import React, { useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
+import { readFileSync, existsSync } from "node:fs";
 import { IMAGE_MASCOT_WIDTH, mascot } from "../../mascot.ts";
-import { loadIndex, buildHabitMap, countTasks, DAILY_NOTE_RE, streak } from "../core/index.ts";
+import { loadIndex, buildHabitMap, countTasks, DAILY_NOTE_RE, streak, getHabitsConfig } from "../core/index.ts";
 import { fuzzySuggest, inlineCommandHint, resolveSubmittedCommand } from "./commands.ts";
 
 const h = React.createElement;
+
+function habitTitles() {
+  const map = new Map<string, string>();
+  if (!existsSync(getHabitsConfig())) return map;
+  const txt = readFileSync(getHabitsConfig(), "utf8");
+  let current: string | null = null;
+  for (const line of txt.split("\n")) {
+    const key = line.match(/^ {2}([a-zA-Z0-9_-]+):\s*$/);
+    if (key) {
+      current = key[1];
+      map.set(current, current);
+      continue;
+    }
+    const title = line.match(/^ {4}title:\s*(.+)\s*$/);
+    if (title && current) map.set(current, title[1].replace(/^"|"$/g, ""));
+  }
+  return map;
+}
 
 export function vaultStats() {
   const notes = loadIndex();
@@ -15,9 +34,10 @@ export function vaultStats() {
   const tags = new Map<string, number>();
   for (const n of notes) for (const t of n.tags) tags.set(t, (tags.get(t) ?? 0) + 1);
   const sortedTags = [...tags.entries()].sort((a, b) => b[1] - a[1]);
+  const titles = habitTitles();
 
   const habitStrs = [...habits.entries()].map(([name, entries]) => ({
-    name,
+    name: titles.get(name) ?? name,
     streak: streak(entries),
   }));
 

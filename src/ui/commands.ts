@@ -1,11 +1,11 @@
 // Command definitions and matching logic
 import {
-  cmdIndex, cmdSearch, cmdBacklinks, cmdFind, cmdDailyOpen, cmdHabitToggle,
+  cmdIndex, cmdSearch, cmdBacklinks, cmdDailyOpen, cmdHabitToggle,
   cmdDailyHabitToggle, cmdInit, cmdTutorial, cmdMigrate, cmdJjAlias,
   cmdPreview, cmdView, cmdNew, cmdQuick, cmdInbox, cmdRecent, cmdOrphans,
   cmdRename, cmdMove, cmdDelete, cmdTasks, cmdTasksAdd, cmdTaskAction, cmdHabitList,
   cmdHabitAdd, cmdHabitRemove, cmdHabitSet, cmdHabitFill, cmdDailyNav,
-  cmdDoctor, cmdTvInstallChannels,
+  cmdDoctor, cmdTag, cmdExplore, cmdTvInstallChannels,
   cmdTv, cmdCommandBar, cmdLinks,
 } from "../core/index.ts";
 
@@ -13,7 +13,7 @@ export type CommandInfo = { name: string; desc: string; tags: string };
 
 export const COMMANDS: CommandInfo[] = [
   {name: "index", desc: "rebuild the note index cache", tags: "rebuild refresh cache metadata parse vault"},
-  {name: "find", desc: "find notes by path, title, or content", tags: "note picker fzf title alias tag editor search"},
+  {name: "explore", desc: "browse notes in yazi and act on selections", tags: "browse picker multiselect open delete move tag preview"},
   {name: "backlinks", desc: "show notes linking to a note", tags: "incoming links graph references mentions"},
   {name: "today", desc: "open or create today's daily note", tags: "daily journal date open create"},
   {name: "habit", desc: "toggle a habit checkbox in today's daily", tags: "daily tracker checkbox streak routine legacy"},
@@ -28,13 +28,14 @@ export const COMMANDS: CommandInfo[] = [
   {name: "rename", desc: "rename a note and update its slug", tags: "rename title slug refactor"},
   {name: "move", desc: "move a note to a different folder", tags: "move folder organize restructure"},
   {name: "delete", desc: "archive (soft-delete) a note", tags: "delete remove archive trash"},
+  {name: "tag", desc: "add or remove tags on a note", tags: "tags metadata edit label categorize"},
   {name: "tasks", desc: "browse and manage tasks in Television", tags: "tasks todo open done checklist television"},
   {name: "habits", desc: "browse and manage habits in Television", tags: "habits tracker streak consistency television"},
   {name: "yesterday", desc: "open yesterday's daily note", tags: "daily back navigate previous"},
   {name: "tomorrow", desc: "open tomorrow's daily note", tags: "daily forward navigate next"},
   {name: "doctor", desc: "check vault health", tags: "health check doctor lint validate"},
   {name: "doctor --fix", desc: "auto-fix vault issues", tags: "fix repair doctor validate"},
-  {name: "sync", desc: "run jj sync alias", tags: "jj git push version control"},
+  {name: "sync", desc: "sync notes with jj or git", tags: "jj git push pull version control"},
   {name: "preview", desc: "render a note preview with dprint", tags: "markdown md read view format"},
   {name: "view", desc: "pretty markdown view with header (dprint)", tags: "markdown md view pretty dprint"},
   {name: "tv install", desc: "install Television channels", tags: "television fuzzy channels setup"},
@@ -97,14 +98,24 @@ export type CommandMatcher = {
 
 export const COMMAND_MATCHERS: CommandMatcher[] = [
   {match: raw => raw === "index" || raw === "rebuild note index", run: () => cmdIndex()},
-  {match: raw => raw === "find" || raw === "search" || raw === "find in notes" || raw.startsWith("find ") || raw.startsWith("search "),
-   run: raw => { const q = raw.replace(/^(?:find|search)\s*/, "").trim(); cmdFind(q); }},
+  {match: raw => raw === "search" || raw.startsWith("search "),
+   run: raw => { const q = raw.replace(/^search\s*/, "").trim(); return cmdSearch(q); }},
   {match: raw => raw === "backlinks" || raw.startsWith("backlinks ") || raw.startsWith("show backlinks "),
    run: raw => cmdBacklinks(raw === "backlinks" ? "" : raw.replace(/^show backlinks\s+|^backlinks\s+/, ""))},
   {match: raw => raw === "today" || raw === "open today note" || raw === "daily open", run: () => cmdDailyOpen()},
   {match: raw => raw === "yesterday", run: () => cmdDailyNav("yesterday")},
   {match: raw => raw === "tomorrow", run: () => cmdDailyNav("tomorrow")},
   {match: raw => raw === "recent", run: () => cmdRecent()},
+  {match: raw => raw === "tag" || raw.startsWith("tag "),
+   run: raw => {
+     const parts = raw.split(/\s+/);
+     const mode = parts[1] === "remove" || parts[1] === "delete" ? "remove" : "add";
+     const note = parts[1] === "add" || parts[1] === "remove" || parts[1] === "delete" ? parts[2] : parts[1];
+     const tags = parts[1] === "add" || parts[1] === "remove" || parts[1] === "delete" ? parts.slice(3).join(" ") : parts.slice(2).join(" ");
+     cmdTag(note ?? "", mode, tags);
+   }},
+  {match: raw => raw === "explore" || raw === "browse" || raw.startsWith("explore ") || raw.startsWith("browse "),
+   run: raw => cmdExplore(raw === "explore" || raw === "browse" ? "" : raw.replace(/^(?:explore|browse)\s+/, ""))},
   {match: raw => raw === "habits", run: () => cmdTv("habits")},
   {match: raw => raw === "habits list" || raw === "habits --list", run: () => cmdHabitList()},
   {match: raw => raw.startsWith("habits add ") || raw.startsWith("habits --add "),

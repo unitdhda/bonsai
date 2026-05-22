@@ -6,6 +6,7 @@ export {
   getIndex,
   getDailyDir,
   getTemplate,
+  getHabitsConfig,
   vaultPath,
   setTuiScreen,
   setTuiStatus,
@@ -16,4 +17,9 @@ export {
   cmdDoctor,
   cmdGenerateTestNotes,
   cmdStats,
+  cmdTag,
+  cmdExplore,
+  cmdTvItems,
+  cmdTvOpenNote,
+  cmdTvPreview,
 } from "./commands.ts";

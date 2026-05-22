@@ -10,7 +10,6 @@ import {
   cmdIndex,
   cmdSearch,
   cmdBacklinks,
-  cmdFind,
   cmdDailyOpen,
   cmdHabitToggle,
   cmdDailyHabitToggle,
@@ -39,6 +38,9 @@ import {
   cmdHabitFill,
   cmdDailyNav,
   cmdDoctor,
+  cmdStats,
+  cmdTag,
+  cmdExplore,
   cmdTvInstallChannels,
   cmdTv,
   cmdTvItems,
@@ -52,9 +54,8 @@ type CliCommandHandler = (args: string[]) => void | Promise<void>;
 
 const CLI_COMMAND_HANDLERS: Record<string, CliCommandHandler> = {
   index: () => cmdIndex(),
-  search: args => { const q = args.join(" "); if (q) cmdSearch(q); else cmdFind(); },
+  search: args => { const q = args.join(" "); if (q) return cmdSearch(q); return cmdSearch(""); },
   backlinks: args => cmdBacklinks(args[0]),
-  find: () => cmdFind(),
   today: () => cmdDailyOpen(),
   yesterday: () => cmdDailyNav("yesterday"),
   tomorrow: () => cmdDailyNav("tomorrow"),
@@ -71,6 +72,14 @@ const CLI_COMMAND_HANDLERS: Record<string, CliCommandHandler> = {
   recent: args => {
     if (!args.length && isTty()) return cmdTv("recent");
     cmdRecent(Number(args[0]) || 10);
+  },
+  explore: args => cmdExplore(args.join(" ")),
+  browse: args => cmdExplore(args.join(" ")),
+  tag: args => {
+    const mode = args[0] === "remove" || args[0] === "delete" ? "remove" : "add";
+    const note = args[0] === "add" || args[0] === "remove" || args[0] === "delete" ? args[1] : args[0];
+    const tags = args[0] === "add" || args[0] === "remove" || args[0] === "delete" ? args.slice(2).join(" ") : args.slice(1).join(" ");
+    cmdTag(note ?? "", mode, tags);
   },
   orphans: () => cmdOrphans(),
   rename: args => cmdRename(args[0], args.slice(1).join(" ")),
@@ -113,7 +122,7 @@ const CLI_COMMAND_HANDLERS: Record<string, CliCommandHandler> = {
     else if (args[0] === "habit-toggle") cmdDailyHabitToggle(args[1], args[2] === "--date" ? args[3] : undefined);
     else console.log("today|yesterday|tomorrow");
   },
-  stats: () => console.log("Use 'bonsai' TUI for stats."),
+  stats: () => cmdStats(),
   doctor: args => cmdDoctor(args[0] === "--fix"),
   "command-bar": () => cmdCommandBar(),
   jj: args => {
@@ -125,7 +134,7 @@ const CLI_COMMAND_HANDLERS: Record<string, CliCommandHandler> = {
     else if (args[0] === "items") cmdTvItems(args[1]);
     else if (args[0] === "open-note") cmdTvOpenNote(args.slice(1).join(" "));
     else if (args[0] === "preview") cmdTvPreview(args.slice(2).join(" "), args[1]);
-    else cmdTv(args[0]);
+    else console.log("Use 'tv install-channels'.");
   },
   tui: () => cmdTui(),
   help: () => printHelp(true),
@@ -140,7 +149,8 @@ function printHelp(verbose = false) {
   if (!verbose) {
     console.log("Commands:");
     console.log("  index                          Rebuild markdown index cache");
-    console.log("  find                           Fuzzy-pick and act on notes");
+    console.log("  search <query>                 Search titles, ids, tags");
+    console.log("  explore                        Browse notes in yazi");
     console.log("  backlinks <note>               Show incoming links");
     console.log("  preview <note>                 dprint-formatted preview");
     console.log("  view <note>                    pretty markdown view with path header");
@@ -151,12 +161,13 @@ function printHelp(verbose = false) {
     console.log("  daily habit-toggle <habit> [--date YYYY-MM-DD] Toggle habit checkbox");
     console.log("  new <title>                    Create a new note from template");
     console.log("  quick <text>                   Append quick capture to inbox");
+    console.log("  tag [add|remove] <note> <tags>  Add or remove tags on a note");
     console.log("  inbox                          Open the inbox note");
     console.log("\nType 'notes help' for full command list.\n");
   } else {
     console.log("Vault:");
     console.log("  index                          Rebuild markdown index cache");
-    console.log("  find                           Fuzzy-pick and act on notes");
+    console.log("  search <query>                 Search titles, ids, tags");
     console.log("  backlinks <note>               Show notes linking to a note");
     console.log("  doctor [--fix]                 Check or repair vault health\n");
     console.log("Notes:");
@@ -165,6 +176,8 @@ function printHelp(verbose = false) {
     console.log("  inbox                          Open inbox");
     console.log("  preview [note]                 dprint preview");
     console.log("  view [note]                    Pretty view");
+    console.log("  tag [add|remove] [note] [tags]  Add or remove tags on a note");
+    console.log("  explore                        Browse notes in yazi");
     console.log("  recent [n]                     Show n recent notes (default 10)");
     console.log("  orphans                        Show notes with no backlinks\n");
     console.log("Editing:");
@@ -190,9 +203,9 @@ function printHelp(verbose = false) {
     console.log("  habits toggle [id] [--date]    Toggle today's/date habit");
     console.log("  habits check [id] [--date]     Mark today's/date habit done");
     console.log("  habits uncheck [id] [--date]   Mark today's/date habit open\n");
-    console.log("Jujutsu:");
-    console.log("  sync                           Run jj sync");
-    console.log("  init                           Initialize vault and jj repo\n");
+    console.log("Version control:");
+    console.log("  sync                           Sync vault with jj or git");
+    console.log("  init                           Initialize vault and repo\n");
     console.log("Television:");
     console.log("  tv install-channels            Install fuzzy picker channels\n");
     console.log("Other:");

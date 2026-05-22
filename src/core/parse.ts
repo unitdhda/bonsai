@@ -64,8 +64,19 @@ export function parseHabits(body: string): Habit[] {
 
 export function parseTasks(body: string): Task[] {
   const tasks: Task[] = [];
+  const lines = body.split("\n");
+  let inHabits = false;
 
-  for (const line of body.split("\n")) {
+  for (const line of lines) {
+    if (/^##\s+Habits\s*$/.test(line)) {
+      inHabits = true;
+      continue;
+    }
+    if (inHabits && /^##\s+/.test(line)) {
+      inHabits = false;
+    }
+    if (inHabits) continue;
+
     const match = line.match(TASK_RE);
     if (!match) continue;
 

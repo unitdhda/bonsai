@@ -256,7 +256,6 @@ function printHelp(verbose = false) {
   if (!verbose) {
     console.log("Commands:");
     console.log("  index                          Rebuild markdown index cache");
-    console.log("  find                           Fuzzy note+content picker with action menu");
     console.log("  search <query>                 Search id/title/aliases/tags");
     console.log("  backlinks <note>               Show incoming links");
     console.log("  preview <note>                 dprint-formatted preview");
@@ -264,6 +263,8 @@ function printHelp(verbose = false) {
     console.log("  daily open [--date YYYY-MM-DD] Create/open daily note from template");
     console.log("  daily habit-toggle <habit> [--date YYYY-MM-DD] Toggle habit checkbox");
     console.log("  recent                         Show recent notes");
+    console.log("  explore                        Browse notes in yazi");
+    console.log("  tag [add|remove] ...           Add or remove tags on a note");
     console.log("  stats                          Vault, task, habit statistics");
     console.log("  new <title>                    Create a new note from template");
     console.log("  quick <text>                   Append quick capture to inbox");
@@ -272,7 +273,6 @@ function printHelp(verbose = false) {
   } else {
     console.log("Vault:");
     console.log("  index                          Rebuild markdown index cache");
-    console.log("  find                           Fuzzy-pick note by path/title/tags");
     console.log("  search <query>                 Search titles, aliases, tags, ids");
     console.log("  backlinks <note>               Show notes linking to a note");
     console.log("  stats                          Vault statistics");
@@ -284,7 +284,8 @@ function printHelp(verbose = false) {
     console.log("  preview [note]                 dprint preview");
     console.log("  view [note]                    Pretty view");
     console.log("  recent [n]                     Show n recent notes (default 10)");
-    console.log("  orphans                        Show notes with no backlinks\n");
+    console.log("  explore                        Browse notes in yazi");
+    console.log("  tag [add|remove] [note] [tags] Add/remove tags on a note\n");
     console.log("Editing:");
     console.log("  rename [note] [new title]      Rename note");
     console.log("  move [note] [folder]           Move note");
