@@ -1,4 +1,5 @@
-![](/screenshot.png)
+https://github.com/user-attachments/assets/7ef60926-dbf6-42d9-b900-4f57c77c2f08
+
 # bonsai
 
 Bonsai is a note manager for a vault. It’s for managing notes, while you can bring your own editor for whatever feels most comfortable.
