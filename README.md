@@ -1,13 +1,15 @@
 <img width="1932" height="1312" alt="bonsai-loop" src="https://github.com/user-attachments/assets/ffeeb0f6-4361-40a1-9d8d-aea85470cf4a" />
 
 # bonsai
+![](/screenshot.png)
+# bonsai
 
 Bonsai is a note manager for a vault. It’s for managing notes, while you can bring your own editor for whatever feels most comfortable.
 
 ## Install
 
 ```bash
-npm install -g @unitdhda/bonsai
+npm install -g bonsai-notes-manager
 ```
 
 ## Dependencies

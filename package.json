@@ -1,13 +1,27 @@
 {
+  "name": "bonsai-notes-manager",
+  "version": "0.1.0",
+  "description": "A note manager for a vault",
+  "license": "MIT",
+  "private": false,
+  "bin": {
+    "bonsai": "./bonsai"
+  },
+  "files": [
+    "bonsai",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "lint": "biome lint notes.ts mascot.ts src/**/*.ts notes.test.ts",
+    "lint:fix": "biome lint --write notes.ts mascot.ts src/**/*.ts notes.test.ts",
+    "build": "bun build ./notes.ts --compile --outfile ./bonsai",
+    "prepublishOnly": "bun build ./notes.ts --compile --outfile ./bonsai"
+  },
   "dependencies": {
     "ink": "^7.0.3",
     "react": "^19.2.6",
     "react-devtools-core": "^7.0.1"
-  },
-  "scripts": {
-    "lint": "biome lint notes.ts mascot.ts src/**/*.ts notes.test.ts",
-    "lint:fix": "biome lint --write notes.ts mascot.ts src/**/*.ts notes.test.ts",
-    "build": "bun build ./notes.ts --compile --outfile ./bonsai"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15"
