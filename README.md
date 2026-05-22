@@ -2,7 +2,7 @@
 
 # Bonsai note manager
 
-Bonsai is a note manager for a vault. It’s for managing notes, while you can bring your own editor for whatever feels most comfortable.
+Bonsai is a note manager for a vault. It’s primary function is managing, while you can bring your own editor for whatever feels most comfortable.
 
 ## Install
 
